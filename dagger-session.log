@@ -1,0 +1,6 @@
+{"port":51323,"session_token":"82609c10-823e-4f52-ad07-786e5b226791"}
+[32m▶[0m connect [2m0.5s[0m
+
+[33mA new release of dagger is available: [0m[36mv0.18.14[0m → [36mv0.18.15[0m
+To upgrade, see https://docs.dagger.io/install
+[33mhttps://github.com/dagger/dagger/releases/tag/v0.18.15[0m

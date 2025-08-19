@@ -1,0 +1,55 @@
+endpoint: http://localhost:8090/query
+headers:
+  Authorization: Basic ZnU6
+introspection: true
+operations:
+  - name: RunestoneCompile
+    query: |
+      query RunestoneCompile {
+        runestone {
+          compile {
+            success
+            stdout
+            stderr
+          }
+        }
+      }
+  - name: RunestoneTest
+    query: |
+      query RunestoneTest {
+        runestone {
+          test {
+            success
+            stdout
+            stderr
+          }
+        }
+      }
+  - name: RunestoneFormat
+    query: |
+      query RunestoneFormat {
+        runestone {
+          format {
+            success
+            stdout
+            stderr
+          }
+        }
+      }
+  - name: GetContainer
+    query: |
+      query GetContainer {
+        container {
+          from(address: "elixir:1.18-alpine") {
+            id
+            platform
+          }
+        }
+      }
+  - name: GetDirectory
+    query: |
+      query GetDirectory {
+        directory {
+          entries
+        }
+      }

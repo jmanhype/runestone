@@ -1,0 +1,196 @@
+graph TB
+    %% External Dependencies
+    subgraph External["External Dependencies"]
+        Plug[Plug/Cowboy<br/>HTTP Server]
+        Ecto[Ecto/Postgrex<br/>Database]
+        Oban[Oban<br/>Background Jobs]
+        HTTPoison[HTTPoison/Hackney<br/>HTTP Client]
+        Jason[Jason<br/>JSON Parser]
+        Telemetry[Telemetry<br/>Observability]
+    end
+
+    %% Application Layer
+    subgraph App["Application Layer"]
+        Application[Runestone.Application<br/>OTP App Root]
+        Repo[Runestone.Repo<br/>Database Repository]
+        TelemetryEvents[Runestone.TelemetryEvents<br/>Event Handlers]
+    end
+
+    %% HTTP Layer
+    subgraph HTTP["HTTP Layer"]
+        Router[Runestone.HTTP.Router<br/>Main API Router]
+        Health[Runestone.HTTP.Health<br/>Health Endpoints]
+        StreamRelay[Runestone.Response.UnifiedStreamRelay<br/>Stream Processing]
+    end
+
+    %% Authentication Layer
+    subgraph Auth["Authentication Layer"]
+        Middleware[Runestone.Auth.Middleware<br/>Auth Pipeline]
+        ApiKeyStore[Runestone.Auth.ApiKeyStore<br/>Key Management]
+        AuthRateLimiter[Runestone.Auth.RateLimiter<br/>Per-Key Limits]
+        ErrorResponse[Runestone.Auth.ErrorResponse<br/>Error Formatting]
+    end
+
+    %% API Layer
+    subgraph API["API Processing Layer"]
+        OpenAIAPI[Runestone.OpenAIAPI<br/>OpenAI Compatible API]
+        RouterLogic[Runestone.Router<br/>Provider Routing]
+        ProviderPool[Runestone.Pipeline.ProviderPool<br/>Request Distribution]
+    end
+
+    %% Response Processing
+    subgraph Response["Response Processing"]
+        Transformer[Runestone.Response.Transformer<br/>Response Transform]
+        StreamFormatter[Runestone.Response.StreamFormatter<br/>SSE Formatting]
+        UsageTracker[Runestone.Response.UsageTracker<br/>Token Tracking]
+        FinishReasonMapper[Runestone.Response.FinishReasonMapper<br/>Completion Status]
+    end
+
+    %% Enhanced Provider Layer
+    subgraph Enhanced["Enhanced Provider Layer"]
+        ProviderSupervisor[Runestone.Providers.EnhancedProviderSupervisor<br/>Provider Supervision]
+        ProviderFactory[Runestone.Providers.ProviderFactory<br/>Provider Management]
+        ProviderAdapter[Runestone.Providers.ProviderAdapter<br/>Legacy Bridge]
+        CircuitBreakerManager[Runestone.Providers.Resilience.CircuitBreakerManager<br/>Failure Detection]
+        FailoverManager[Runestone.Providers.Resilience.FailoverManager<br/>Failover Logic]
+        RetryPolicy[Runestone.Providers.Resilience.RetryPolicy<br/>Retry Logic]
+        TelemetryHandler[Runestone.Providers.Monitoring.TelemetryHandler<br/>Metrics Collection]
+    end
+
+    %% Provider Implementations
+    subgraph Providers["Provider Implementations"]
+        OpenAIProvider[Runestone.Providers.OpenAIProvider<br/>Enhanced OpenAI]
+        AnthropicProvider[Runestone.Providers.AnthropicProvider<br/>Enhanced Anthropic]
+        LegacyOpenAI[Runestone.Provider.OpenAI<br/>Legacy OpenAI]
+        LegacyAnthropic[Runestone.Provider.Anthropic<br/>Legacy Anthropic]
+        Embeddings[Runestone.Provider.Embeddings<br/>Embeddings API]
+    end
+
+    %% Background Jobs
+    subgraph Jobs["Background Jobs"]
+        MetricsCollector[Runestone.Jobs.MetricsCollector<br/>Metrics Aggregation]
+        HealthCheck[Runestone.Jobs.HealthCheck<br/>Health Monitoring]
+        OverflowDrain[Runestone.Jobs.OverflowDrain<br/>Overflow Processing]
+    end
+
+    %% Utility Modules
+    subgraph Utils["Utility Modules"]
+        CostTable[Runestone.CostTable<br/>Cost Calculations]
+        RateLimiter[Runestone.RateLimiter<br/>Legacy Rate Limiter]
+        CircuitBreaker[Runestone.CircuitBreaker<br/>Legacy Circuit Breaker]
+        Overflow[Runestone.Overflow<br/>Request Queuing]
+        TelemetryUtil[Runestone.Telemetry<br/>Telemetry Helper]
+    end
+
+    %% External Dependencies Connections
+    Application --> Plug
+    Application --> Ecto
+    Application --> Oban
+    Repo --> Ecto
+    Router --> Plug
+    HTTPoison --> LegacyOpenAI
+    HTTPoison --> LegacyAnthropic
+    HTTPoison --> OpenAIProvider
+    HTTPoison --> AnthropicProvider
+    TelemetryEvents --> Telemetry
+    TelemetryUtil --> Telemetry
+
+    %% Application Layer Connections
+    Application --> Repo
+    Application --> TelemetryEvents
+    Application --> ProviderSupervisor
+    Application --> Router
+    Application --> Health
+
+    %% HTTP Layer Connections
+    Router --> Middleware
+    Router --> OpenAIAPI
+    Router --> StreamRelay
+    Router --> ErrorResponse
+
+    %% Authentication Flow
+    Middleware --> ApiKeyStore
+    Middleware --> AuthRateLimiter
+    Middleware --> ErrorResponse
+    Middleware --> TelemetryUtil
+
+    %% API Processing Flow
+    OpenAIAPI --> RouterLogic
+    OpenAIAPI --> ProviderPool
+    OpenAIAPI --> AuthRateLimiter
+    OpenAIAPI --> ErrorResponse
+    OpenAIAPI --> TelemetryUtil
+    RouterLogic --> CostTable
+    RouterLogic --> TelemetryUtil
+
+    %% Provider Pool Flow
+    ProviderPool --> ProviderAdapter
+    ProviderPool --> LegacyOpenAI
+    ProviderPool --> LegacyAnthropic
+    ProviderPool --> TelemetryUtil
+
+    %% Enhanced Provider Architecture
+    ProviderSupervisor --> ProviderFactory
+    ProviderSupervisor --> CircuitBreakerManager
+    ProviderSupervisor --> FailoverManager
+    ProviderFactory --> OpenAIProvider
+    ProviderFactory --> AnthropicProvider
+    ProviderFactory --> TelemetryHandler
+    ProviderFactory --> CircuitBreakerManager
+    ProviderFactory --> FailoverManager
+    ProviderAdapter --> ProviderFactory
+
+    %% Provider Resilience
+    OpenAIProvider --> RetryPolicy
+    OpenAIProvider --> CircuitBreakerManager
+    AnthropicProvider --> RetryPolicy
+    AnthropicProvider --> CircuitBreakerManager
+    FailoverManager --> CircuitBreakerManager
+
+    %% Response Processing Flow
+    StreamRelay --> Transformer
+    StreamRelay --> StreamFormatter
+    StreamRelay --> UsageTracker
+    StreamRelay --> FinishReasonMapper
+    StreamRelay --> TelemetryUtil
+
+    %% Background Jobs
+    Oban --> MetricsCollector
+    Oban --> HealthCheck
+    Oban --> OverflowDrain
+    MetricsCollector --> TelemetryEvents
+    HealthCheck --> TelemetryEvents
+    OverflowDrain --> RouterLogic
+    OverflowDrain --> ProviderPool
+
+    %% Legacy Components
+    Router --> RateLimiter
+    Application --> CircuitBreaker
+    Router --> Overflow
+
+    %% Telemetry Flow
+    TelemetryHandler --> TelemetryEvents
+    TelemetryUtil --> TelemetryEvents
+
+    %% Styling
+    classDef external fill:#ffcccc
+    classDef app fill:#ccffcc
+    classDef http fill:#ccccff
+    classDef auth fill:#ffffcc
+    classDef api fill:#ffccff
+    classDef response fill:#ccffff
+    classDef enhanced fill:#ffddcc
+    classDef providers fill:#ddffcc
+    classDef jobs fill:#ddccff
+    classDef utils fill:#ffddff
+
+    class Plug,Ecto,Oban,HTTPoison,Jason,Telemetry external
+    class Application,Repo,TelemetryEvents app
+    class Router,Health,StreamRelay http
+    class Middleware,ApiKeyStore,AuthRateLimiter,ErrorResponse auth
+    class OpenAIAPI,RouterLogic,ProviderPool api
+    class Transformer,StreamFormatter,UsageTracker,FinishReasonMapper response
+    class ProviderSupervisor,ProviderFactory,ProviderAdapter,CircuitBreakerManager,FailoverManager,RetryPolicy,TelemetryHandler enhanced
+    class OpenAIProvider,AnthropicProvider,LegacyOpenAI,LegacyAnthropic,Embeddings providers
+    class MetricsCollector,HealthCheck,OverflowDrain jobs
+    class CostTable,RateLimiter,CircuitBreaker,Overflow,TelemetryUtil utils

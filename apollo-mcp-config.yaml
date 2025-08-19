@@ -1,0 +1,15 @@
+endpoint: https://countries.trevorblades.com/graphql
+transport:
+  type: stdio
+schema:
+  source: local
+  path: ./schema.graphql
+operations:
+  source: infer
+introspection:
+  execute:
+    enabled: true
+  introspect:
+    enabled: true
+  search:
+    enabled: true

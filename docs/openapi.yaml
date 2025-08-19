@@ -1,0 +1,848 @@
+openapi: 3.0.0
+info:
+  title: Runestone API
+  version: 0.6.0
+  description: |
+    A high-performance, telemetry-driven API gateway for LLM providers with intelligent routing, 
+    rate limiting, and overflow handling. Compatible with OpenAI API format with additional 
+    features for multi-provider support and cost optimization.
+    
+    ## Features
+    - Multi-provider routing (OpenAI, Anthropic, and more)
+    - Cost-aware intelligent routing
+    - Rate limiting with overflow queue management
+    - Server-Sent Events (SSE) streaming
+    - Comprehensive telemetry and monitoring
+    
+  contact:
+    name: Runestone API Support
+    url: https://github.com/jmanhype/runestone
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:4001
+    description: Development server
+  - url: https://api.runestone.dev
+    description: Production server
+
+security:
+  - BearerAuth: []
+  - ApiKeyAuth: []
+
+paths:
+  /v1/chat/completions:
+    post:
+      summary: Create chat completion
+      description: |
+        Creates a model response for the given chat conversation. Supports both streaming 
+        and non-streaming modes with intelligent provider routing.
+      operationId: createChatCompletion
+      tags:
+        - Chat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateChatCompletionRequest'
+            examples:
+              basic_request:
+                summary: Basic chat request
+                value:
+                  model: "gpt-4o-mini"
+                  messages:
+                    - role: "user"
+                      content: "Hello, how are you?"
+              streaming_request:
+                summary: Streaming chat request
+                value:
+                  model: "gpt-4o-mini"
+                  messages:
+                    - role: "user"
+                      content: "Tell me a story"
+                  stream: true
+              cost_optimized:
+                summary: Cost-optimized routing
+                value:
+                  messages:
+                    - role: "user"
+                      content: "What's the weather like?"
+                  model_family: "general"
+                  max_cost_per_token: 0.0001
+                  tenant_id: "my-tenant"
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateChatCompletionResponse'
+              examples:
+                standard_response:
+                  summary: Standard completion response
+                  value:
+                    id: "chatcmpl-123"
+                    object: "chat.completion"
+                    created: 1677652288
+                    model: "gpt-4o-mini"
+                    choices:
+                      - index: 0
+                        message:
+                          role: "assistant"
+                          content: "Hello! I'm doing well, thank you for asking."
+                        finish_reason: "stop"
+                    usage:
+                      prompt_tokens: 10
+                      completion_tokens: 12
+                      total_tokens: 22
+            text/event-stream:
+              schema:
+                type: string
+                format: binary
+              examples:
+                streaming_response:
+                  summary: Server-Sent Events stream
+                  value: |
+                    data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1677652288,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}
+                    
+                    data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1677652288,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"content":" there!"},"finish_reason":null}]}
+                    
+                    data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1677652288,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+                    
+                    data: [DONE]
+        '202':
+          description: Request queued for processing due to rate limiting
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueuedResponse'
+              example:
+                message: "Request queued for processing"
+                job_id: 12345
+                request_id: "req_abc123"
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_messages:
+                  summary: Invalid messages format
+                  value:
+                    error:
+                      message: "messages must be an array"
+                      type: "invalid_request_error"
+                      code: "invalid_request"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  message: "Invalid API key"
+                  type: "invalid_request_error"
+                  code: "invalid_api_key"
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  message: "Rate limit exceeded"
+                  type: "rate_limit_error"
+                  code: "rate_limit_exceeded"
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  message: "Service temporarily unavailable"
+                  type: "service_error"
+                  code: "service_unavailable"
+
+  /v1/chat/stream:
+    post:
+      summary: Create streaming chat completion
+      description: |
+        Creates a streaming chat completion. This is a Runestone-specific endpoint that 
+        always returns streaming responses using Server-Sent Events.
+      operationId: createStreamingChatCompletion
+      tags:
+        - Chat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateStreamingChatRequest'
+            example:
+              provider: "openai"
+              model: "gpt-4o-mini"
+              messages:
+                - role: "user"
+                  content: "Tell me a joke"
+              tenant_id: "my-tenant"
+      responses:
+        '200':
+          description: Streaming response
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                format: binary
+        '202':
+          description: Request queued for processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueuedResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/models:
+    get:
+      summary: List available models
+      description: Lists the currently available models and their capabilities
+      operationId: listModels
+      tags:
+        - Models
+      responses:
+        '200':
+          description: List of available models
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListModelsResponse'
+              example:
+                object: "list"
+                data:
+                  - id: "gpt-4o-mini"
+                    object: "model"
+                    created: 1677610602
+                    owned_by: "openai"
+                    provider: "openai"
+                    capabilities: ["chat", "streaming", "function_calling"]
+                    cost_per_1k_tokens: 0.15
+                  - id: "claude-3-5-sonnet"
+                    object: "model"
+                    created: 1677610602
+                    owned_by: "anthropic"
+                    provider: "anthropic"
+                    capabilities: ["chat", "streaming"]
+                    cost_per_1k_tokens: 0.25
+
+  /v1/models/{model}:
+    get:
+      summary: Retrieve model details
+      description: Retrieves detailed information about a specific model
+      operationId: retrieveModel
+      tags:
+        - Models
+      parameters:
+        - name: model
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The model identifier
+          example: "gpt-4o-mini"
+      responses:
+        '200':
+          description: Model details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Model'
+              example:
+                id: "gpt-4o-mini"
+                object: "model"
+                created: 1677610602
+                owned_by: "openai"
+                provider: "openai"
+                capabilities: ["chat", "streaming", "function_calling"]
+                cost_per_1k_tokens: 0.15
+                max_tokens: 128000
+                context_window: 128000
+        '404':
+          description: Model not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /health:
+    get:
+      summary: Health check
+      description: Returns the overall health status of the system
+      operationId: healthCheck
+      tags:
+        - System
+      security: []
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                healthy: true
+                timestamp: 1677652288000
+                components:
+                  database: "healthy"
+                  providers: "healthy"
+                  rate_limiter: "healthy"
+                  overflow_queue: "healthy"
+        '503':
+          description: System is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+              example:
+                healthy: false
+                timestamp: 1677652288000
+                components:
+                  database: "unhealthy"
+                  providers: "healthy"
+                  rate_limiter: "healthy"
+                  overflow_queue: "degraded"
+
+  /health/live:
+    get:
+      summary: Liveness probe
+      description: Simple liveness check for container orchestration
+      operationId: livenessCheck
+      tags:
+        - System
+      security: []
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                  timestamp:
+                    type: integer
+                    format: int64
+                    example: 1677652288000
+
+  /health/ready:
+    get:
+      summary: Readiness probe
+      description: Readiness check for container orchestration
+      operationId: readinessCheck
+      tags:
+        - System
+      security: []
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ready:
+                    type: boolean
+                    example: true
+                  timestamp:
+                    type: integer
+                    format: int64
+                    example: 1677652288000
+        '503':
+          description: Service is not ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ready:
+                    type: boolean
+                    example: false
+                  timestamp:
+                    type: integer
+                    format: int64
+                    example: 1677652288000
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token authentication (OpenAI-compatible)
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: API Key authentication with 'Bearer' prefix
+
+  schemas:
+    CreateChatCompletionRequest:
+      type: object
+      required:
+        - messages
+      properties:
+        model:
+          type: string
+          description: ID of the model to use
+          default: "gpt-4o-mini"
+          example: "gpt-4o-mini"
+        messages:
+          type: array
+          description: List of messages comprising the conversation
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+          minItems: 1
+        provider:
+          type: string
+          description: Specific provider to use (optional, for direct routing)
+          enum: ["openai", "anthropic"]
+          example: "openai"
+        tenant_id:
+          type: string
+          description: Tenant identifier for rate limiting and billing
+          example: "my-tenant"
+        stream:
+          type: boolean
+          description: Whether to stream partial message deltas
+          default: false
+        max_tokens:
+          type: integer
+          description: Maximum number of tokens to generate
+          minimum: 1
+          maximum: 4096
+          example: 150
+        temperature:
+          type: number
+          description: Sampling temperature between 0 and 2
+          minimum: 0
+          maximum: 2
+          default: 1
+          example: 0.7
+        top_p:
+          type: number
+          description: Nucleus sampling parameter
+          minimum: 0
+          maximum: 1
+          default: 1
+          example: 0.9
+        frequency_penalty:
+          type: number
+          description: Penalty for frequent tokens
+          minimum: -2
+          maximum: 2
+          default: 0
+        presence_penalty:
+          type: number
+          description: Penalty for new tokens
+          minimum: -2
+          maximum: 2
+          default: 0
+        # Runestone-specific routing parameters
+        model_family:
+          type: string
+          description: Model family for cost-aware routing
+          enum: ["general", "coding", "reasoning", "vision"]
+          example: "general"
+        capabilities:
+          type: array
+          description: Required capabilities for cost-aware routing
+          items:
+            type: string
+            enum: ["chat", "streaming", "function_calling", "vision", "code_generation"]
+          example: ["chat", "streaming"]
+        max_cost_per_token:
+          type: number
+          description: Maximum acceptable cost per token for routing
+          minimum: 0
+          example: 0.0001
+        request_id:
+          type: string
+          description: Optional request identifier for tracking
+          example: "req_abc123"
+
+    CreateStreamingChatRequest:
+      type: object
+      required:
+        - messages
+      properties:
+        model:
+          type: string
+          description: ID of the model to use
+          default: "gpt-4o-mini"
+          example: "gpt-4o-mini"
+        messages:
+          type: array
+          description: List of messages comprising the conversation
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+          minItems: 1
+        provider:
+          type: string
+          description: Specific provider to use
+          enum: ["openai", "anthropic"]
+          example: "openai"
+        tenant_id:
+          type: string
+          description: Tenant identifier for rate limiting
+          example: "my-tenant"
+        max_tokens:
+          type: integer
+          description: Maximum number of tokens to generate
+          minimum: 1
+          maximum: 4096
+        temperature:
+          type: number
+          description: Sampling temperature
+          minimum: 0
+          maximum: 2
+          default: 1
+        # Runestone-specific parameters
+        model_family:
+          type: string
+          description: Model family for routing
+          enum: ["general", "coding", "reasoning", "vision"]
+        capabilities:
+          type: array
+          description: Required capabilities
+          items:
+            type: string
+            enum: ["chat", "streaming", "function_calling", "vision"]
+        max_cost_per_token:
+          type: number
+          description: Maximum cost per token
+          minimum: 0
+
+    ChatMessage:
+      type: object
+      required:
+        - role
+        - content
+      properties:
+        role:
+          type: string
+          enum: ["system", "user", "assistant", "function"]
+          description: The role of the message author
+        content:
+          type: string
+          description: The contents of the message
+          example: "Hello, how can I help you today?"
+        name:
+          type: string
+          description: Name of the function (for function role)
+
+    CreateChatCompletionResponse:
+      type: object
+      required:
+        - id
+        - object
+        - created
+        - model
+        - choices
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the completion
+          example: "chatcmpl-123"
+        object:
+          type: string
+          enum: ["chat.completion"]
+          description: Object type
+        created:
+          type: integer
+          format: int64
+          description: Unix timestamp of creation
+          example: 1677652288
+        model:
+          type: string
+          description: Model used for completion
+          example: "gpt-4o-mini"
+        choices:
+          type: array
+          description: List of completion choices
+          items:
+            $ref: '#/components/schemas/ChatCompletionChoice'
+        usage:
+          $ref: '#/components/schemas/Usage'
+        # Runestone-specific metadata
+        provider:
+          type: string
+          description: Provider that handled the request
+          example: "openai"
+        routing_policy:
+          type: string
+          description: Routing policy used
+          enum: ["default", "cost"]
+          example: "cost"
+        request_id:
+          type: string
+          description: Request identifier
+          example: "req_abc123"
+
+    ChatCompletionChoice:
+      type: object
+      required:
+        - index
+        - message
+        - finish_reason
+      properties:
+        index:
+          type: integer
+          description: Choice index
+          example: 0
+        message:
+          $ref: '#/components/schemas/ChatMessage'
+        finish_reason:
+          type: string
+          enum: ["stop", "length", "function_call", "content_filter"]
+          description: Reason the completion finished
+          example: "stop"
+
+    Usage:
+      type: object
+      required:
+        - prompt_tokens
+        - completion_tokens
+        - total_tokens
+      properties:
+        prompt_tokens:
+          type: integer
+          description: Number of tokens in the prompt
+          example: 10
+        completion_tokens:
+          type: integer
+          description: Number of tokens in the completion
+          example: 12
+        total_tokens:
+          type: integer
+          description: Total number of tokens used
+          example: 22
+
+    QueuedResponse:
+      type: object
+      required:
+        - message
+        - job_id
+        - request_id
+      properties:
+        message:
+          type: string
+          description: Queue status message
+          example: "Request queued for processing"
+        job_id:
+          type: integer
+          description: Job identifier for tracking
+          example: 12345
+        request_id:
+          type: string
+          description: Request identifier
+          example: "req_abc123"
+        estimated_wait_time:
+          type: integer
+          description: Estimated wait time in seconds
+          example: 30
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - message
+            - type
+          properties:
+            message:
+              type: string
+              description: Human-readable error message
+              example: "Invalid request format"
+            type:
+              type: string
+              description: Error type category
+              enum: 
+                - "invalid_request_error"
+                - "authentication_error"
+                - "permission_error"
+                - "not_found_error"
+                - "rate_limit_error"
+                - "api_error"
+                - "overloaded_error"
+                - "service_error"
+              example: "invalid_request_error"
+            code:
+              type: string
+              description: Specific error code
+              example: "invalid_request"
+            param:
+              type: string
+              description: Parameter that caused the error
+              example: "messages"
+
+    ListModelsResponse:
+      type: object
+      required:
+        - object
+        - data
+      properties:
+        object:
+          type: string
+          enum: ["list"]
+          description: Object type
+        data:
+          type: array
+          description: List of available models
+          items:
+            $ref: '#/components/schemas/Model'
+
+    Model:
+      type: object
+      required:
+        - id
+        - object
+        - created
+        - owned_by
+      properties:
+        id:
+          type: string
+          description: Model identifier
+          example: "gpt-4o-mini"
+        object:
+          type: string
+          enum: ["model"]
+          description: Object type
+        created:
+          type: integer
+          format: int64
+          description: Unix timestamp of model creation
+          example: 1677610602
+        owned_by:
+          type: string
+          description: Organization that owns the model
+          example: "openai"
+        # Runestone-specific properties
+        provider:
+          type: string
+          description: Provider hosting the model
+          example: "openai"
+        capabilities:
+          type: array
+          description: Model capabilities
+          items:
+            type: string
+            enum: ["chat", "streaming", "function_calling", "vision", "code_generation"]
+          example: ["chat", "streaming", "function_calling"]
+        cost_per_1k_tokens:
+          type: number
+          description: Cost per 1000 tokens
+          example: 0.15
+        max_tokens:
+          type: integer
+          description: Maximum tokens supported
+          example: 128000
+        context_window:
+          type: integer
+          description: Context window size
+          example: 128000
+
+    HealthResponse:
+      type: object
+      required:
+        - healthy
+        - timestamp
+      properties:
+        healthy:
+          type: boolean
+          description: Overall health status
+          example: true
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix timestamp of health check
+          example: 1677652288000
+        components:
+          type: object
+          description: Health status of individual components
+          additionalProperties:
+            type: string
+            enum: ["healthy", "degraded", "unhealthy"]
+          example:
+            database: "healthy"
+            providers: "healthy"
+            rate_limiter: "healthy"
+            overflow_queue: "healthy"
+        version:
+          type: string
+          description: Application version
+          example: "0.6.0"
+        uptime:
+          type: integer
+          description: Uptime in seconds
+          example: 3600
+
+  examples:
+    BasicChatRequest:
+      summary: Basic chat completion request
+      value:
+        model: "gpt-4o-mini"
+        messages:
+          - role: "user"
+            content: "What is the capital of France?"
+
+    StreamingChatRequest:
+      summary: Streaming chat completion request
+      value:
+        model: "gpt-4o-mini"
+        messages:
+          - role: "user"
+            content: "Tell me a story about a robot"
+        stream: true
+        tenant_id: "my-tenant"
+
+    CostOptimizedRequest:
+      summary: Cost-optimized routing request
+      value:
+        messages:
+          - role: "user"
+            content: "Summarize this text"
+        model_family: "general"
+        max_cost_per_token: 0.0001
+        capabilities: ["chat"]
+
+tags:
+  - name: Chat
+    description: Chat completion endpoints for conversational AI
+  - name: Models
+    description: Model information and capabilities
+  - name: System
+    description: System health and monitoring endpoints
+
+externalDocs:
+  description: Runestone GitHub Repository
+  url: https://github.com/jmanhype/runestone

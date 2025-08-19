@@ -1,0 +1,48 @@
+{
+  "name": "runestone",
+  "version": "0.6.0",
+  "description": "A high-performance, telemetry-driven API gateway for LLM providers with intelligent routing, rate limiting, and overflow handling.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "lib": "lib",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "validate-api": "node docs/validate-spec.js",
+    "generate-docs": "redoc-cli build docs/openapi.yaml --output docs/api-docs.html",
+    "serve-docs": "redoc-cli serve docs/openapi.yaml",
+    "lint-api": "swagger-cli validate docs/openapi.yaml",
+    "generate-json": "node -e \"const yaml = require('js-yaml'); const fs = require('fs'); const spec = yaml.load(fs.readFileSync('docs/openapi.yaml', 'utf8')); fs.writeFileSync('docs/openapi.json', JSON.stringify(spec, null, 2));\"",
+    "api-examples": "./docs/examples/curl-examples.sh",
+    "python-examples": "python3 docs/examples/python-client.py"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jmanhype/runestone.git"
+  },
+  "keywords": [
+    "api-gateway",
+    "llm",
+    "openai",
+    "anthropic",
+    "streaming",
+    "rate-limiting",
+    "elixir",
+    "openapi"
+  ],
+  "author": "Runestone Team",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jmanhype/runestone/issues"
+  },
+  "homepage": "https://github.com/jmanhype/runestone#readme",
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "redoc-cli": "^0.13.21",
+    "swagger-cli": "^4.0.4"
+  }
+}
