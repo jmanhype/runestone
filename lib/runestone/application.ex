@@ -10,8 +10,8 @@ defmodule Runestone.Application do
     :ets.new(:runestone_metrics, [:set, :public, :named_table])
     
     children = [
-      # Database (disabled for now - requires PostgreSQL)
-      # Runestone.Repo,
+      # Database 
+      Runestone.Repo,
       
       # Circuit breaker system (start before provider supervisor)
       Runestone.CircuitBreaker,
@@ -30,8 +30,8 @@ defmodule Runestone.Application do
       
       # Circuit breakers are now managed by the enhanced provider system
       
-      # Oban for job processing (disabled for now - requires database)
-      # {Oban, Application.fetch_env!(:runestone, Oban)},
+      # Oban for job processing
+      {Oban, Application.fetch_env!(:runestone, Oban)},
       
       # Authentication components
       {Runestone.Auth.ApiKeyStore, get_auth_config()},
