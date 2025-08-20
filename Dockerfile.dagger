@@ -1,0 +1,63 @@
+# Multi-stage build for Runestone with Dagger
+# Build stage
+FROM elixir:1.18-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache build-base git
+
+# Set working directory
+WORKDIR /app
+
+# Copy mix files
+COPY mix.exs mix.lock ./
+
+# Set MIX_ENV to prod
+ENV MIX_ENV=prod
+
+# Install hex and rebar
+RUN mix local.hex --force && \
+    mix local.rebar --force
+
+# Get dependencies
+RUN mix deps.get --only prod
+
+# Copy source code
+COPY . .
+
+# Elixir 1.17+ has fixed the db_connection compilation issues
+# No special flags needed
+
+# Compile the application
+RUN mix compile
+
+# Build release
+RUN mix release
+
+# Runtime stage
+FROM alpine:3.19
+
+# Install runtime dependencies
+RUN apk add --no-cache openssl ncurses-libs libstdc++ libgcc
+
+# Create app user
+RUN adduser -D -h /app app
+
+# Set working directory
+WORKDIR /app
+
+# Copy release from builder
+COPY --from=builder --chown=app:app /app/_build/prod/rel/runestone ./
+
+# Set user
+USER app
+
+# Set environment
+ENV HOME=/app
+ENV MIX_ENV=prod
+ENV PORT=4000
+
+# Expose ports
+EXPOSE 4000 4001
+
+# Start the application
+CMD ["bin/runestone", "start"]

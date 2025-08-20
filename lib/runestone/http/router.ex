@@ -20,6 +20,22 @@ defmodule Runestone.HTTP.Router do
   
   plug :dispatch
   
+  # GraphQL endpoint
+  post "/graphql" do
+    opts = Absinthe.Plug.init(schema: RunestoneWeb.Schema)
+    Absinthe.Plug.call(conn, opts)
+  end
+  
+  # WebSocket endpoint (handled by Phoenix)
+  get "/socket/websocket" do
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, Jason.encode!(%{
+      message: "WebSocket endpoint available at ws://#{conn.host}:#{conn.port}/socket",
+      instructions: "Connect with token parameter: ws://#{conn.host}:#{conn.port}/socket/websocket?token=YOUR_API_KEY"
+    }))
+  end
+  
   # Health check endpoints
   get "/health" do
     health_status = Runestone.HTTP.Health.gather_health_status()

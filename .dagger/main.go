@@ -11,7 +11,7 @@ type Runestone struct{}
 // Test runs mix test on the Elixir project
 func (m *Runestone) Test(ctx context.Context, source *dagger.Directory) (string, error) {
 	return dag.Container().
-		From("elixir:1.16-alpine").
+		From("elixir:1.18-alpine").
 		WithDirectory("/app", source).
 		WithWorkdir("/app").
 		WithExec([]string{"mix", "local.hex", "--force"}).
@@ -24,7 +24,7 @@ func (m *Runestone) Test(ctx context.Context, source *dagger.Directory) (string,
 // Format checks code formatting with mix format
 func (m *Runestone) Format(ctx context.Context, source *dagger.Directory) (string, error) {
 	return dag.Container().
-		From("elixir:1.16-alpine").
+		From("elixir:1.18-alpine").
 		WithDirectory("/app", source).
 		WithWorkdir("/app").
 		WithExec([]string{"mix", "format", "--check-formatted"}).
@@ -34,7 +34,7 @@ func (m *Runestone) Format(ctx context.Context, source *dagger.Directory) (strin
 // Compile compiles the Elixir project
 func (m *Runestone) Compile(ctx context.Context, source *dagger.Directory) (string, error) {
 	return dag.Container().
-		From("elixir:1.16-alpine").
+		From("elixir:1.18-alpine").
 		WithDirectory("/app", source).
 		WithWorkdir("/app").
 		WithExec([]string{"mix", "local.hex", "--force"}).
@@ -47,7 +47,7 @@ func (m *Runestone) Compile(ctx context.Context, source *dagger.Directory) (stri
 // Server starts the Phoenix server (if applicable)
 func (m *Runestone) Server(ctx context.Context, source *dagger.Directory) *dagger.Service {
 	return dag.Container().
-		From("elixir:1.16-alpine").
+		From("elixir:1.18-alpine").
 		WithDirectory("/app", source).
 		WithWorkdir("/app").
 		WithExec([]string{"mix", "local.hex", "--force"}).
@@ -61,7 +61,7 @@ func (m *Runestone) Server(ctx context.Context, source *dagger.Directory) *dagge
 // Deps gets and compiles dependencies
 func (m *Runestone) Deps(ctx context.Context, source *dagger.Directory) (string, error) {
 	return dag.Container().
-		From("elixir:1.16-alpine").
+		From("elixir:1.18-alpine").
 		WithDirectory("/app", source).
 		WithWorkdir("/app").
 		WithExec([]string{"mix", "local.hex", "--force"}).

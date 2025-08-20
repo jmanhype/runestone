@@ -1,8 +1,8 @@
 import Config
 
 # Port configuration
-config :runestone, :port, String.to_integer(System.get_env("PORT", "4003"))
-config :runestone, :health_port, String.to_integer(System.get_env("HEALTH_PORT", "4004"))
+config :runestone, :port, String.to_integer(System.get_env("PORT", "4000"))
+config :runestone, :health_port, String.to_integer(System.get_env("HEALTH_PORT", "4001"))
 
 # Provider configurations
 config :runestone, :providers, %{

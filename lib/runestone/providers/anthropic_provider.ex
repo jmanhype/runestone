@@ -108,13 +108,16 @@ defmodule Runestone.Providers.AnthropicProvider do
 
   @impl true
   def transform_request(request) do
-    {system_message, user_messages} = extract_system_message(request.messages)
+    messages = get_messages(request)
+    {system_message, user_messages} = extract_system_message(messages)
+    
+    model = get_model(request)
     
     base_request = %{
-      "model" => request.model || "claude-3-5-sonnet-20241022",
+      "model" => map_model_name(model),
       "messages" => transform_messages(user_messages),
-      "stream" => Map.get(request, :stream, true),
-      "max_tokens" => Map.get(request, :max_tokens, 1024)
+      "stream" => get_stream(request),
+      "max_tokens" => get_max_tokens(request)
     }
 
     if system_message do
@@ -122,8 +125,37 @@ defmodule Runestone.Providers.AnthropicProvider do
     else
       base_request
     end
-    |> maybe_add_temperature(Map.get(request, :temperature))
+    |> maybe_add_temperature(get_temperature(request))
   end
+  
+  defp get_messages(%{messages: messages}), do: messages
+  defp get_messages(%{"messages" => messages}), do: messages
+  defp get_messages(_), do: []
+  
+  defp get_model(%{model: model}), do: model
+  defp get_model(%{"model" => model}), do: model
+  defp get_model(_), do: "claude-3-5-sonnet-20241022"
+  
+  defp get_stream(%{stream: stream}), do: stream
+  defp get_stream(%{"stream" => stream}), do: stream
+  defp get_stream(_), do: true
+  
+  defp get_max_tokens(%{max_tokens: max_tokens}) when is_integer(max_tokens), do: max_tokens
+  defp get_max_tokens(%{max_tokens: max_tokens}) when is_binary(max_tokens), do: String.to_integer(max_tokens)
+  defp get_max_tokens(%{"max_tokens" => max_tokens}) when is_integer(max_tokens), do: max_tokens
+  defp get_max_tokens(%{"max_tokens" => max_tokens}) when is_binary(max_tokens), do: String.to_integer(max_tokens)
+  defp get_max_tokens(_), do: 1024
+  
+  defp get_temperature(%{temperature: temp}), do: temp
+  defp get_temperature(%{"temperature" => temp}), do: temp
+  defp get_temperature(_), do: nil
+  
+  defp map_model_name("claude-3-haiku"), do: "claude-3-haiku-20240307"
+  defp map_model_name("claude-3-5-sonnet"), do: "claude-3-5-sonnet-20241022"
+  defp map_model_name("claude-3-5-haiku"), do: "claude-3-5-haiku-20241022"
+  defp map_model_name("claude-3-opus"), do: "claude-3-opus-20240229"
+  defp map_model_name("claude-3-sonnet"), do: "claude-3-sonnet-20240229"
+  defp map_model_name(model), do: model
 
   @impl true
   def handle_error(error) do
@@ -195,6 +227,9 @@ defmodule Runestone.Providers.AnthropicProvider do
       request_body: transformed_request,
       raw_request: request
     })
+    
+    # Log the exact URL for debugging
+    Logger.error("EXACT URL: #{url}")
 
     retry_config = %{
       max_attempts: config.retry_attempts,
@@ -278,8 +313,8 @@ defmodule Runestone.Providers.AnthropicProvider do
         parse_stream_content(ref, on_event, model, config, start_time)
         
       %HTTPoison.AsyncChunk{id: ^ref, chunk: chunk} ->
-        Logger.error("AnthropicProvider received chunk on 404", %{
-          chunk: chunk
+        Logger.error("AnthropicProvider received chunk", %{
+          chunk: String.slice(chunk, 0, 200)
         })
         process_chunk(chunk, on_event, config)
         parse_stream_content(ref, on_event, model, config, start_time)
@@ -307,31 +342,59 @@ defmodule Runestone.Providers.AnthropicProvider do
         String.starts_with?(line, "data: ") ->
           data = String.trim_leading(line, "data: ") |> String.trim()
           
-          case Jason.decode(data) do
-            {:ok, %{"type" => "content_block_delta", "delta" => %{"text" => text}}} when is_binary(text) ->
-              on_event.({:delta_text, text})
-              
-            {:ok, %{"type" => "message_start", "message" => message}} ->
-              if config.telemetry do
-                on_event.({:metadata, %{message_start: message}})
-              end
-              
-            {:ok, %{"type" => "message_stop"}} ->
-              on_event.(:done)
-              
-            {:ok, %{"type" => "error", "error" => error}} ->
-              on_event.({:error, error})
-              
-            {:error, _} ->
-              # Ignore malformed JSON chunks
-              :ok
-              
-            _ ->
-              :ok
+          # Handle the special [DONE] message
+          if data == "[DONE]" do
+            on_event.(:done)
+          else
+            case Jason.decode(data) do
+              {:ok, %{"type" => "content_block_delta", "delta" => %{"text" => text}}} when is_binary(text) ->
+                Logger.debug("AnthropicProvider extracted text: #{text}")
+                on_event.({:delta_text, text})
+                
+              {:ok, %{"type" => "message_start", "message" => message}} ->
+                Logger.debug("AnthropicProvider message_start", %{message: message})
+                if config.telemetry do
+                  on_event.({:metadata, %{message_start: message}})
+                end
+                
+              {:ok, %{"type" => "content_block_start"}} ->
+                Logger.debug("AnthropicProvider content_block_start")
+                :ok
+                
+              {:ok, %{"type" => "message_stop"}} ->
+                Logger.debug("AnthropicProvider message_stop")
+                on_event.(:done)
+                
+              {:ok, %{"type" => "message_delta"}} ->
+                # Message delta events don't contain text content
+                :ok
+                
+              {:ok, %{"type" => "content_block_stop"}} ->
+                Logger.debug("AnthropicProvider content_block_stop")
+                :ok
+                
+              {:ok, %{"type" => "error", "error" => error}} ->
+                Logger.error("AnthropicProvider error event", %{error: error})
+                on_event.({:error, error})
+                
+              {:error, decode_error} ->
+                # Log the problematic data for debugging
+                Logger.debug("AnthropicProvider JSON decode error", %{
+                  data: String.slice(data, 0, 100),
+                  error: decode_error
+                })
+                :ok
+                
+              other ->
+                Logger.debug("AnthropicProvider unhandled event", %{event: other})
+                :ok
+            end
           end
           
-        String.contains?(line, "event: message_stop") ->
-          on_event.(:done)
+        String.starts_with?(line, "event:") ->
+          event_type = String.trim_leading(line, "event:") |> String.trim()
+          Logger.debug("AnthropicProvider SSE event type: #{event_type}")
+          :ok
           
         true ->
           :ok
@@ -340,24 +403,32 @@ defmodule Runestone.Providers.AnthropicProvider do
   end
 
   defp extract_system_message(messages) do
-    case Enum.find(messages, &(&1.role == "system")) do
+    case Enum.find(messages, &(get_role(&1) == "system")) do
       nil ->
         {nil, messages}
       
       system_message ->
-        user_messages = Enum.reject(messages, &(&1.role == "system"))
-        {system_message, user_messages}
+        user_messages = Enum.reject(messages, &(get_role(&1) == "system"))
+        {%{content: get_content(system_message)}, user_messages}
     end
   end
 
   defp transform_messages(messages) do
     Enum.map(messages, fn message ->
       %{
-        "role" => message.role,
-        "content" => message.content
+        "role" => get_role(message),
+        "content" => get_content(message)
       }
     end)
   end
+  
+  defp get_role(%{role: role}), do: role
+  defp get_role(%{"role" => role}), do: role
+  defp get_role(_), do: "user"
+  
+  defp get_content(%{content: content}), do: content
+  defp get_content(%{"content" => content}), do: content
+  defp get_content(_), do: ""
 
   defp maybe_add_temperature(request, nil), do: request
   defp maybe_add_temperature(request, temperature) when is_number(temperature) do
@@ -368,7 +439,7 @@ defmodule Runestone.Providers.AnthropicProvider do
     # Rough estimation: 1 token ≈ 4 characters for English text
     total_chars = 
       messages
-      |> Enum.map(fn msg -> String.length(msg.content) end)
+      |> Enum.map(fn msg -> String.length(get_content(msg)) end)
       |> Enum.sum()
     
     max(div(total_chars, 4), 1)
@@ -376,7 +447,9 @@ defmodule Runestone.Providers.AnthropicProvider do
 
   defp collect_error_body(ref, config) do
     chunks = collect_error_chunks(ref, config, [])
-    Enum.join(chunks, "")
+    body = Enum.join(chunks, "")
+    Logger.error("AnthropicProvider error response body: #{body}")
+    body
   end
   
   defp collect_error_chunks(ref, config, acc) do

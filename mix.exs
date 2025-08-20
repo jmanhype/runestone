@@ -5,10 +5,12 @@ defmodule Runestone.MixProject do
     [
       app: :runestone,
       version: "0.6.0",
-      elixir: "~> 1.15",
+      elixir: "~> 1.17",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      elixirc_paths: elixirc_paths(Mix.env())
+      elixirc_paths: elixirc_paths(Mix.env()),
+      # Elixir 1.17+ has improved type checking that fixes db_connection issues
+      elixirc_options: []
     ]
   end
 

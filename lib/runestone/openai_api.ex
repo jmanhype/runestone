@@ -542,7 +542,13 @@ defmodule Runestone.OpenAIAPI do
 
   defp stream_chat_responses(conn, request) do
     receive do
+      {:chunk, %{"choices" => [%{"delta" => %{"content" => text}}]}} ->
+        chunk = format_chat_completion_chunk(request, text)
+        send_sse_chunk(conn, chunk)
+        stream_chat_responses(conn, request)
+      
       {:delta_text, text} ->
+        # Legacy format support
         chunk = format_chat_completion_chunk(request, text)
         send_sse_chunk(conn, chunk)
         stream_chat_responses(conn, request)
@@ -566,7 +572,13 @@ defmodule Runestone.OpenAIAPI do
 
   defp stream_completions_responses(conn, request) do
     receive do
+      {:chunk, %{"choices" => [%{"delta" => %{"content" => text}}]}} ->
+        chunk = format_completion_chunk(request, text)
+        send_sse_chunk(conn, chunk)
+        stream_completions_responses(conn, request)
+      
       {:delta_text, text} ->
+        # Legacy format support
         chunk = format_completion_chunk(request, text)
         send_sse_chunk(conn, chunk)
         stream_completions_responses(conn, request)
@@ -599,7 +611,11 @@ defmodule Runestone.OpenAIAPI do
 
   defp collect_chunks(acc) do
     receive do
+      {:chunk, %{"choices" => [%{"delta" => %{"content" => text}}]}} ->
+        collect_chunks([text | acc])
+      
       {:delta_text, text} ->
+        # Legacy format support
         collect_chunks([text | acc])
       
       :done ->

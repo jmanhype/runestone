@@ -364,7 +364,8 @@ defmodule Runestone.Providers.Resilience.FailoverManager do
       last_used: System.system_time()
     }
     
-    put_in(state.provider_stats, stats_path, new_stats)
+    # Return the entire state structure with updated provider_stats
+    %{state | provider_stats: put_in(state.provider_stats, stats_path, new_stats)}
   end
 
   defp get_service_stats(service_name, state) do
