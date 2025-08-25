@@ -39,6 +39,7 @@
   },
   "homepage": "https://github.com/jmanhype/runestone#readme",
   "dependencies": {
+    "graphql": "^16.11.0",
     "js-yaml": "^4.1.0"
   },
   "devDependencies": {

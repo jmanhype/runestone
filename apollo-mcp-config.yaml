@@ -1,9 +1,9 @@
-endpoint: https://countries.trevorblades.com/graphql
+endpoint: http://127.0.0.1:54321/query
 transport:
   type: stdio
 schema:
   source: local
-  path: ./schema.graphql
+  path: ./dagger-schema.graphql
 operations:
   source: infer
 introspection:
