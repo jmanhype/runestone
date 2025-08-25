@@ -1,0 +1,6 @@
+headers:
+  all:
+    request:
+      - insert:
+          name: "authorization" 
+          value: "Basic ZnU6"  # Base64 encoded "fu:"

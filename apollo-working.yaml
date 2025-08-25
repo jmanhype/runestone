@@ -1,0 +1,15 @@
+endpoint: http://localhost:9999/query
+transport:
+  type: stdio
+schema:
+  source: local
+  path: /Users/speed/Downloads/dspy/runestone/dagger-schema.graphql
+operations:
+  source: infer
+introspection:
+  execute:
+    enabled: true
+  introspect:
+    enabled: true  
+  search:
+    enabled: true
