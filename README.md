@@ -37,6 +37,9 @@ Runestone manages:
 - **Production Ready** - Rate limiting, circuit breakers, and overflow queuing with PostgreSQL/Oban
 - **Real-time Streaming** - SSE streaming with proper `[DONE]` markers for all providers
 - **Enterprise Features** - API key management, telemetry, GraphQL API, and WebSocket support
+- **ReqLLM Integration** - Leverages [ReqLLM](https://github.com/agentjido/req_llm) for provider behaviors
+- **Model Aliasing** - Simple aliases like `fast`, `smart`, `cheap` mapped to specific provider models
+- **Hot-Reload Config** - YAML-based alias configuration with automatic hot-reload support
 
 [**Jump to Quick Start**](#quick-start) <br>
 [**Jump to Docker Deployment**](#docker) <br>
@@ -353,6 +356,60 @@ config :runestone, :cost_table, [
     capabilities: [:chat, :streaming, :function_calling, :vision]
   }
 ]
+```
+
+## ReqLLM Integration
+
+Runestone leverages [ReqLLM](https://github.com/agentjido/req_llm) for provider behaviors, maintaining clean separation of concerns:
+
+- **ReqLLM** handles provider communication, behaviors, and streaming
+- **Runestone** handles gateway concerns: routing, error normalization, aliases, and SSE proxying
+
+### Model Aliasing
+
+Configure model aliases in `priv/aliases.yaml`:
+
+```yaml
+aliases:
+  fast:
+    provider: groq
+    model: llama3-8b-8192
+
+  smart:
+    provider: openai
+    model: gpt-4o
+
+  cheap:
+    provider: anthropic
+    model: claude-3-haiku-20240307
+```
+
+Use aliases in your requests:
+
+```python
+response = client.chat.completions.create(
+    model="fast",  # Resolves to groq:llama3-8b-8192
+    messages=[{"role": "user", "content": "Hello!"}]
+)
+```
+
+### Error Normalization
+
+All provider errors are normalized to a consistent envelope:
+
+```json
+{
+  "error": {
+    "code": "rate_limit",
+    "type": "rate_limit",
+    "message": "Rate limit exceeded",
+    "provider": "openai",
+    "retry_able": true,
+    "status": 429
+  },
+  "request_id": "req-123",
+  "timestamp": 1234567890
+}
 ```
 
 # Development
