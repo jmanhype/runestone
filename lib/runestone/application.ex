@@ -27,7 +27,10 @@ defmodule Runestone.Application do
       
       # NEW: Response caching system
       Runestone.Cache.ResponseCache,
-      
+
+      # NEW: Alias loader for model aliases with hot-reload
+      Runestone.AliasLoader,
+
       # Circuit breakers are now managed by the enhanced provider system
       
       # Oban for job processing

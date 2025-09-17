@@ -35,7 +35,13 @@ defmodule Runestone.MixProject do
       {:postgrex, "~> 0.19"},
       {:absinthe, "~> 1.7"},
       {:absinthe_plug, "~> 1.5"},
-      {:dataloader, "~> 2.0"}
+      {:dataloader, "~> 2.0"},
+      # ReqLLM integration for provider behaviors
+      {:req_llm, github: "agentjido/req_llm", branch: "main"},
+      # For hot-reload of aliases
+      {:file_system, "~> 1.0"},
+      # For YAML alias configuration
+      {:yaml_elixir, "~> 2.9"}
     ]
   end
 
