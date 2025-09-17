@@ -331,7 +331,7 @@ defmodule Runestone.OpenAITestConfig do
     children = [
       {Runestone.Auth.ApiKeyStore, []},
       {Runestone.Auth.RateLimiter, []},
-      {Runestone.Overflow, []}
+      {Runestone.AliasLoader, []}
     ]
     
     Enum.each(children, fn {module, opts} ->
