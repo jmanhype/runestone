@@ -1,110 +1,356 @@
 # Runestone Client SDKs
 
-OpenAI-compatible client libraries for the Runestone API Gateway.
+Official client SDKs for Runestone LLM Gateway in Python, JavaScript, and TypeScript.
 
-## Available SDKs
+All clients are **OpenAI-compatible** and work as drop-in replacements for the official OpenAI SDKs.
 
-- **Python** - Full-featured client with streaming support
-- **Node.js/TypeScript** - Modern async/await API with TypeScript definitions
-- **Go** - Lightweight and performant client
-- **Ruby** - Simple and elegant Ruby interface
+## 🚀 Features
 
-## Installation
+- ✅ **OpenAI-Compatible API** - Works with existing OpenAI SDK code
+- ✅ **Full Streaming Support** - Real-time streaming for all languages
+- ✅ **Comprehensive Error Handling** - Proper error types and messages
+- ✅ **Type Safety** - Full TypeScript support with detailed types
+- ✅ **Timeout Configuration** - Configurable request timeouts
+- ✅ **Rate Limiting** - Built-in rate limit error handling
+- ✅ **Production Ready** - Robust error handling and logging
 
-### Python
+## 📦 Available SDKs
+
+| Language | File | Status | Features |
+|----------|------|--------|----------|
+| **Python** | `runestone_python_client.py` | ✅ Production Ready | Streaming, Error Handling, Timeouts |
+| **JavaScript** | `index.js` | ✅ Production Ready | Streaming, Error Handling, Async Iterators |
+| **TypeScript** | `index.ts` | ✅ Production Ready | Full Type Safety, Streaming, Error Handling |
+| Go | `runestone.go` | ⚠️ Basic | Basic functionality |
+| Ruby | `runestone.rb` | ⚠️ Basic | Basic functionality |
+
+---
+
+## 🐍 Python Client
+
+### Installation
+
 ```bash
 pip install requests sseclient-py
-# Then copy runestone_python_client.py to your project
 ```
 
-### Node.js
-```bash
-npm install axios eventsource
-# Then copy index.js or index.ts to your project
-```
+### Quick Start
 
-### Go
-```go
-go get github.com/runestone/client-go
-```
-
-### Ruby
-```ruby
-# Add to Gemfile:
-# gem 'runestone', path: './path/to/sdk'
-```
-
-## Quick Start
-
-All SDKs follow the same pattern as the official OpenAI libraries:
-
-### Python
 ```python
 from runestone_python_client import RunestoneClient
 
-client = RunestoneClient(api_key="your-api-key")
+# Initialize client
+client = RunestoneClient(
+    api_key="sk-test-001",
+    base_url="http://localhost:4003/v1",
+    timeout=60  # Optional: request timeout in seconds
+)
+
+# Non-streaming chat completion
 response = client.chat.completions.create(
     model="gpt-4o-mini",
     messages=[{"role": "user", "content": "Hello!"}]
 )
+print(response)
+
+# Streaming chat completion
+stream = client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[{"role": "user", "content": "Tell me a story"}],
+    stream=True
+)
+for chunk in stream:
+    if chunk.get("choices"):
+        content = chunk["choices"][0].get("delta", {}).get("content")
+        if content:
+            print(content, end="", flush=True)
 ```
 
-### Node.js
+### Error Handling
+
+```python
+from runestone_python_client import (
+    RunestoneClient,
+    AuthenticationError,
+    RateLimitError,
+    APIError
+)
+
+try:
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": "Hello!"}]
+    )
+except AuthenticationError as e:
+    print(f"Authentication failed: {e}")
+except RateLimitError as e:
+    print(f"Rate limit exceeded: {e}")
+except APIError as e:
+    print(f"API error: {e} (status: {e.status_code})")
+```
+
+---
+
+## 📦 JavaScript Client
+
+### Installation
+
+```bash
+npm install axios
+```
+
+### Quick Start
+
 ```javascript
 const RunestoneClient = require('./index.js');
 
-const client = new RunestoneClient('your-api-key');
-const response = await client.chat.completions.create({
+// Initialize client
+const client = new RunestoneClient(
+  'sk-test-001',
+  'http://localhost:4003/v1',
+  {
+    timeout: 60000,  // Optional: timeout in milliseconds
+    maxRetries: 3    // Optional: max retry attempts
+  }
+);
+
+// Non-streaming chat completion
+async function chat() {
+  const response = await client.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [{ role: 'user', content: 'Hello!' }]
-});
+  });
+  console.log(response);
+}
+
+// Streaming chat completion
+async function streamChat() {
+  const stream = await client.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [{ role: 'user', content: 'Tell me a story' }],
+    stream: true
+  });
+
+  for await (const chunk of stream) {
+    const content = chunk.choices[0]?.delta?.content;
+    if (content) {
+      process.stdout.write(content);
+    }
+  }
+}
 ```
 
-### Go
-```go
-client := runestone.NewClient("your-api-key")
-response, err := client.CreateChatCompletion(runestone.ChatCompletionRequest{
-    Model: "gpt-4o-mini",
-    Messages: []runestone.ChatMessage{
-        {Role: "user", Content: "Hello!"},
-    },
-})
+### Error Handling
+
+```javascript
+const {
+  RunestoneClient,
+  AuthenticationError,
+  RateLimitError,
+  RunestoneError
+} = require('./index.js');
+
+async function example() {
+  try {
+    const response = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: 'Hello!' }]
+    });
+  } catch (error) {
+    if (error instanceof AuthenticationError) {
+      console.error('Authentication failed:', error.message);
+    } else if (error instanceof RateLimitError) {
+      console.error('Rate limit exceeded:', error.message);
+    } else if (error instanceof RunestoneError) {
+      console.error(`API error: ${error.message} (status: ${error.statusCode})`);
+    }
+  }
+}
 ```
 
-### Ruby
-```ruby
-client = Runestone::Client.new(api_key: 'your-api-key')
-response = client.chat_completion(
+---
+
+## 📘 TypeScript Client
+
+### Installation
+
+```bash
+npm install axios
+npm install --save-dev @types/node
+```
+
+### Quick Start
+
+```typescript
+import {
+  RunestoneClient,
+  ChatCompletionRequest,
+  ChatCompletionResponse,
+  ChatCompletionChunk
+} from './index';
+
+// Initialize client
+const client = new RunestoneClient(
+  'sk-test-001',
+  'http://localhost:4003/v1',
+  {
+    timeout: 60000,  // Optional: timeout in milliseconds
+    maxRetries: 3    // Optional: max retry attempts
+  }
+);
+
+// Non-streaming chat completion
+async function chat(): Promise<void> {
+  const response = await client.chat.create({
     model: 'gpt-4o-mini',
     messages: [{ role: 'user', content: 'Hello!' }]
+  }) as ChatCompletionResponse;
+
+  console.log(response.choices[0].message.content);
+}
+
+// Streaming chat completion
+async function streamChat(): Promise<void> {
+  const stream = await client.chat.create({
+    model: 'gpt-4o-mini',
+    messages: [{ role: 'user', content: 'Tell me a story' }],
+    stream: true
+  }) as AsyncIterableIterator<ChatCompletionChunk>;
+
+  for await (const chunk of stream) {
+    const content = chunk.choices[0]?.delta?.content;
+    if (content) {
+      process.stdout.write(content);
+    }
+  }
+}
+```
+
+---
+
+## ⚙️ Configuration Options
+
+### Python
+
+```python
+client = RunestoneClient(
+    api_key="sk-test-001",           # Required
+    base_url="http://localhost:4003/v1",  # Optional (default: http://localhost:4003/v1)
+    timeout=60,                      # Optional, seconds (default: 60)
+    max_retries=3                    # Optional (default: 3)
 )
 ```
 
-## Configuration
+### JavaScript/TypeScript
 
-All SDKs support custom base URLs for different deployments:
+```javascript
+const client = new RunestoneClient(
+  'sk-test-001',                     // Required
+  'http://localhost:4003/v1',        // Optional (default: http://localhost:4003/v1)
+  {
+    timeout: 60000,                  // Optional, milliseconds (default: 60000)
+    maxRetries: 3                    // Optional (default: 3)
+  }
+);
+```
 
-- Python: `RunestoneClient(api_key="...", base_url="https://api.yourdomain.com/v1")`
-- Node.js: `new RunestoneClient('api-key', 'https://api.yourdomain.com/v1')`
-- Go: Set `client.BaseURL = "https://api.yourdomain.com/v1"`
-- Ruby: `Runestone::Client.new(api_key: '...', base_url: 'https://api.yourdomain.com/v1')`
+---
 
-## Features
+## 🚨 Error Types
 
-✅ Chat Completions (streaming and non-streaming)
-✅ Legacy Completions
-✅ Models listing and retrieval
-✅ Embeddings generation
-✅ Full error handling
-✅ Rate limit management
-✅ Authentication
+All SDKs provide comprehensive error handling:
 
-## OpenAI Compatibility
+| Error Type | HTTP Status | Description |
+|------------|-------------|-------------|
+| `AuthenticationError` | 401 | Invalid or missing API key |
+| `RateLimitError` | 429 | Rate limit exceeded |
+| `APIError` / `RunestoneError` | 4xx/5xx | General API errors |
 
-These SDKs are designed to be drop-in replacements for OpenAI's official libraries. Simply change:
-- The import/require statement
-- The base URL (if using OpenAI's SDK directly)
+### Error Properties
 
-## License
+- **Python**: `message`, `status_code`, `response`
+- **JavaScript/TypeScript**: `message`, `statusCode`, `response`
 
-MIT License - See LICENSE file for details.
+---
+
+## 🔄 OpenAI SDK Compatibility
+
+These clients are designed to be **drop-in replacements** for the official OpenAI SDKs:
+
+### Python Migration
+
+```python
+# Before (OpenAI SDK)
+from openai import OpenAI
+client = OpenAI(api_key="sk-...")
+
+# After (Runestone SDK)
+from runestone_python_client import RunestoneClient
+client = RunestoneClient(api_key="sk-test-001", base_url="http://localhost:4003/v1")
+
+# Same API calls work!
+response = client.chat.completions.create(...)
+```
+
+### JavaScript Migration
+
+```javascript
+// Before (OpenAI SDK)
+import OpenAI from 'openai';
+const client = new OpenAI({ apiKey: 'sk-...' });
+
+// After (Runestone SDK)
+const RunestoneClient = require('./index.js');
+const client = new RunestoneClient('sk-test-001', 'http://localhost:4003/v1');
+
+// Same API calls work!
+const response = await client.chat.completions.create(...);
+```
+
+---
+
+## 🧪 Testing
+
+Each SDK includes comprehensive test suites:
+
+### Python Tests
+```bash
+python tests/validation/python_sdk_test.py --base-url http://localhost:4003 --api-key sk-test-001
+```
+
+### JavaScript Tests
+```bash
+node tests/validation/nodejs_sdk_test.js --base-url http://localhost:4003 --api-key sk-test-001
+```
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! Please:
+
+1. Add tests for new features
+2. Follow existing code style
+3. Update documentation
+4. Ensure all tests pass
+
+---
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/jmanhype/runestone/issues)
+- **Documentation**: [Main README](../README.md)
+- **Discord**: [Join our community](https://discord.gg/runestone)
+
+---
+
+## 📄 License
+
+MIT License - see [LICENSE](../LICENSE) file for details.
+
+---
+
+<p align="center">
+  <strong>Runestone Client SDKs v0.6.1</strong><br>
+  Production-ready OpenAI-compatible clients for Python, JavaScript, and TypeScript
+</p>
